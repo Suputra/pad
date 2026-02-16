@@ -38,24 +38,19 @@ sudo systemctl status pad
 
 ## Optional: Nginx integration
 
-Use Nginx in front of the app and serve uploaded files from `media/` directly:
+Use Nginx in front of the app and proxy everything to `pad` (including `/media/*` files):
 
 ```nginx
 server {
     listen 80;
     server_name pad.example.com;
 
-    root /home/saahas/pad/media;
-
     location / {
-        try_files $uri @pad;
-    }
-
-    location @pad {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
     }
