@@ -48,18 +48,12 @@ HTML = r"""<!DOCTYPE html>
         }
         .sidebar {
             width: 220px;
-            min-width: 140px;
-            max-width: 520px;
             background: #0a0a0a;
             border-right: 1px solid #222;
             display: flex;
             flex-direction: column;
             flex-shrink: 0;
             min-height: 0;
-        }
-        .sidebar.collapsed {
-            width: 40px !important;
-            min-width: 40px;
         }
         .sidebar-header {
             padding: 8px;
@@ -81,11 +75,6 @@ HTML = r"""<!DOCTYPE html>
             white-space: nowrap;
         }
         .btn:hover { background: #222; color: #aaa; }
-        .icon-btn {
-            width: 22px;
-            padding: 4px 0;
-            text-align: center;
-        }
         .file-list {
             flex: 1;
             overflow-y: auto;
@@ -119,28 +108,6 @@ HTML = r"""<!DOCTYPE html>
         }
         .file-item:hover .delete { opacity: 1; }
         .file-item .delete:hover { color: #f66; }
-        .sidebar.collapsed #upload-btn,
-        .sidebar.collapsed .file-list {
-            display: none;
-        }
-        .sidebar.collapsed .sidebar-header {
-            justify-content: center;
-            padding: 8px 4px;
-        }
-        .resizer {
-            background: transparent;
-            flex-shrink: 0;
-            position: relative;
-            z-index: 2;
-        }
-        .resizer.vertical {
-            width: 5px;
-            cursor: col-resize;
-        }
-        .resizer:hover,
-        .resizer.dragging {
-            background: #1a1a1a;
-        }
         .main {
             flex: 1;
             display: flex;
@@ -206,27 +173,7 @@ HTML = r"""<!DOCTYPE html>
         #rendered th { background: #1a1a1a; }
         #rendered hr { border: none; border-top: 1px solid #333; margin: 12px 0; }
         #rendered img { max-width: 100%; border-radius: 4px; }
-        .status-bar {
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            left: 0;
-            padding: 4px 10px;
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 6px;
-            background: linear-gradient(transparent, rgba(17,17,17,0.9) 40%);
-            pointer-events: none;
-        }
-        .status-bar .btn {
-            pointer-events: auto;
-            font-size: 10px;
-            padding: 3px 7px;
-            color: #555;
-        }
-        .status-bar .btn:hover { color: #999; background: #1a1a1a; }
-        .status-bar .btn.active { color: #6bf; }
+        .btn.active { color: #6bf; }
         .drop-overlay {
             position: fixed;
             inset: 0;
@@ -245,19 +192,9 @@ HTML = r"""<!DOCTYPE html>
             }
             .sidebar {
                 width: 100%;
-                max-width: none;
-                min-width: 100%;
                 max-height: 40vh;
                 border-right: none;
                 border-bottom: 1px solid #222;
-            }
-            .sidebar.collapsed {
-                width: 100% !important;
-                min-width: 100%;
-                max-height: 36px;
-            }
-            .resizer.vertical {
-                display: none;
             }
         }
     </style>
@@ -267,20 +204,16 @@ HTML = r"""<!DOCTYPE html>
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <button class="btn" id="upload-btn">+ upload</button>
-                <button class="btn icon-btn" id="toggle-sidebar" title="Toggle files panel">&lt;</button>
+                <button class="btn" id="save-as">save as</button>
+                <button class="btn" id="toggle-mode" title="Ctrl+E">rendered</button>
                 <input type="file" id="file-input" multiple>
             </div>
             <div class="file-list" id="files"></div>
         </div>
-        <div class="resizer vertical" id="sidebar-resizer"></div>
         <div class="main">
             <div class="editor-shell edit-mode" id="editor-shell">
                 <textarea id="pad" placeholder="start typing..."></textarea>
                 <div id="rendered" title="Click to edit"></div>
-            </div>
-            <div class="status-bar">
-                <button class="btn" id="toggle-mode" title="Ctrl+E">rendered</button>
-                <button class="btn" id="save-as">save as</button>
             </div>
         </div>
     </div>
@@ -296,9 +229,6 @@ HTML = r"""<!DOCTYPE html>
         const fileInput = document.getElementById('file-input');
         const uploadBtn = document.getElementById('upload-btn');
         const dropOverlay = document.getElementById('drop-overlay');
-        const sidebar = document.getElementById('sidebar');
-        const sidebarResizer = document.getElementById('sidebar-resizer');
-        const toggleSidebarBtn = document.getElementById('toggle-sidebar');
         const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
         const ws = new WebSocket(`${wsProtocol}://${location.host}/ws`);
 
@@ -500,44 +430,6 @@ HTML = r"""<!DOCTYPE html>
             if (event.dataTransfer.files.length) uploadFiles(event.dataTransfer.files);
         });
 
-        function syncSidebarControl() {
-            toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed') ? '>' : '<';
-        }
-
-        toggleSidebarBtn.addEventListener('click', () => {
-            sidebar.classList.toggle('collapsed');
-            syncSidebarControl();
-        });
-
-        function setupSidebarResize() {
-            let startX = 0;
-            let startWidth = 0;
-
-            sidebarResizer.addEventListener('mousedown', (event) => {
-                if (sidebar.classList.contains('collapsed')) return;
-                startX = event.clientX;
-                startWidth = sidebar.getBoundingClientRect().width;
-                sidebarResizer.classList.add('dragging');
-                document.body.style.cursor = 'col-resize';
-
-                const onMove = (moveEvent) => {
-                    const next = Math.max(140, Math.min(520, startWidth + (moveEvent.clientX - startX)));
-                    sidebar.style.width = `${next}px`;
-                };
-                const onUp = () => {
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    sidebarResizer.classList.remove('dragging');
-                    document.body.style.cursor = '';
-                };
-
-                document.addEventListener('mousemove', onMove);
-                document.addEventListener('mouseup', onUp);
-            });
-        }
-
-        syncSidebarControl();
-        setupSidebarResize();
         loadFiles();
     </script>
 </body>
